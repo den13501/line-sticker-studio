@@ -335,6 +335,15 @@
       </label>
 
       <label class="field">
+        Chroma Key
+        <select id="chroma-key">
+          <option value="green" selected>綠幕 #00FF00</option>
+          <option value="magenta">洋紅幕 #FF00FF</option>
+        </select>
+        <span class="field-hint">綠色角色建議選洋紅幕；粉紅/紫色角色建議選綠幕。生成和去背會使用同一個 key color。</span>
+      </label>
+
+      <label class="field">
         🌐 貼圖文字語言
         <select id="text-lang">
           <option value="zh-TW" selected>繁體中文</option>
@@ -431,9 +440,16 @@
           <option value="aggressive">積極</option>
         </select>
       </label>
+      <label class="bg-tune" for="bg-key-select" title="選擇這批圖使用的 chroma key 背景色">
+        Key
+        <select id="bg-key-select" aria-label="Chroma Key 顏色">
+          <option value="green" selected>綠幕</option>
+          <option value="magenta">洋紅幕</option>
+        </select>
+      </label>
       <button class="ghost" id="bg-restore-btn" hidden>
         <svg class="btn-icon"><use href="#i-refresh"/></svg>
-        <span data-i18n="bg_restore_btn">還原綠底</span>
+        <span data-i18n="bg_restore_btn">還原 Key 底</span>
       </button>
       <button class="ghost" id="download-grid-btn" hidden title="下載 Gemini 原始 3×3 grid PNG（備份用、之後可走 BYOG 重切）">
         <svg class="btn-icon"><use href="#i-download"/></svg>

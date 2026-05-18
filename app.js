@@ -110,6 +110,11 @@ const LANG_KEY = "line-sticker-lang";
 // uses when rendering text onto the sticker. Default zh-TW (Taiwan).
 const TEXT_LANG_KEY = "line-sticker-text-lang";
 const SUPPORTED_TEXT_LANGS = ["zh-TW", "zh-CN", "en", "ja", "ko"];
+const CHROMA_KEY_PREF = "line-sticker-chroma-key";
+const CHROMA_KEYS = {
+  green: { label: "綠幕", hex: "#00FF00", rgb: [0, 255, 0] },
+  magenta: { label: "洋紅幕", hex: "#FF00FF", rgb: [255, 0, 255] },
+};
 function loadTextLang() {
   const v = localStorage.getItem(TEXT_LANG_KEY);
   return SUPPORTED_TEXT_LANGS.includes(v) ? v : "zh-TW";
@@ -118,6 +123,18 @@ function saveTextLang(lang) {
   if (SUPPORTED_TEXT_LANGS.includes(lang)) {
     localStorage.setItem(TEXT_LANG_KEY, lang);
   }
+}
+function normalizeChromaKey(key) {
+  return CHROMA_KEYS[key] ? key : "green";
+}
+function loadChromaKey() {
+  return normalizeChromaKey(localStorage.getItem(CHROMA_KEY_PREF));
+}
+function saveChromaKey(key) {
+  localStorage.setItem(CHROMA_KEY_PREF, normalizeChromaKey(key));
+}
+function chromaKeyColor(key = state?.chromaKey) {
+  return CHROMA_KEYS[normalizeChromaKey(key)];
 }
 
 // ------------------------------------------------------------------
@@ -183,11 +200,11 @@ const I18N = {
     "ko": "모든 배경 제거 (chroma key)",
   },
   bg_restore_btn: {
-    "zh-TW": "還原綠底",
-    "zh-CN": "还原绿底",
-    "en": "Restore green bg",
-    "ja": "緑背景に戻す",
-    "ko": "녹색 배경 복원",
+    "zh-TW": "還原 Key 底",
+    "zh-CN": "还原 Key 底",
+    "en": "Restore key bg",
+    "ja": "キー背景に戻す",
+    "ko": "키 배경 복원",
   },
   download_grid_btn: {
     "zh-TW": "下載原始 grid",
@@ -464,6 +481,7 @@ const state = {
   styleHint: "match",
   withText: true,
   textLang: loadTextLang(), // "zh-TW" | "zh-CN" | "en" | "ja" | "ko"
+  chromaKey: loadChromaKey(), // "green" | "magenta"
   campaign: null,        // null or campaign id
   slotConfig: loadSlotConfig(), // length-PACK_SIZE
   tiles: [],             // [{ canvas, transparent: false, phrase, busy: false }]
@@ -637,6 +655,7 @@ function resetAll() {
 const styleHintSel = $("style-hint");
 const withTextSel = $("with-text");
 const textLangSel = $("text-lang");
+const chromaKeySel = $("chroma-key");
 const generateBtn = $("generate-btn");
 
 if (textLangSel) {
@@ -645,6 +664,16 @@ if (textLangSel) {
     state.textLang = textLangSel.value;
     saveTextLang(state.textLang);
   });
+}
+function setChromaKey(key, { persist = true } = {}) {
+  state.chromaKey = normalizeChromaKey(key);
+  if (persist) saveChromaKey(state.chromaKey);
+  if (chromaKeySel) chromaKeySel.value = state.chromaKey;
+  if (bgKeySelect) bgKeySelect.value = state.chromaKey;
+}
+if (chromaKeySel) {
+  chromaKeySel.value = state.chromaKey;
+  chromaKeySel.addEventListener("change", () => setChromaKey(chromaKeySel.value));
 }
 // Dim the language picker while 無字模式 — text-lang is irrelevant then.
 function refreshTextLangAvailability() {
@@ -692,8 +721,8 @@ async function generateAll() {
     showQuotaExceededModal();
     return;
   }
-  state.styleHint = styleHintSel.value;
   state.withText = withTextSel.value === "true";
+  setChromaKey(chromaKeySel?.value || state.chromaKey);
   state.tiles = [];
   state.bgRemoved = false;
   $("bg-restore-btn").hidden = true;
@@ -742,6 +771,7 @@ async function generateAll() {
       slots: state.slotConfig,
       styleHint: state.styleHint,
       withText: state.withText,
+      chromaKey: state.chromaKey,
       campaign: state.campaign,
       lang: state.textLang,
       turnstileToken: tsToken,
@@ -762,6 +792,7 @@ async function generateAll() {
       styleHint: state.styleHint,
       campaign: state.campaign,
       withText: state.withText,
+      chromaKey: state.chromaKey,
       phrases: result.phrases,
     });
     const tiles = await splitGrid(gridImg);
@@ -951,6 +982,7 @@ async function handleGridUpload(file) {
   await saveCurrentGridToHistory("byog", {
     fileName: file.name,
     aspectRatio: img.naturalWidth / img.naturalHeight,
+    chromaKey: state.chromaKey,
   });
 
   $("step-preview").hidden = false;
@@ -996,11 +1028,11 @@ async function splitGrid(img) {
       tileCanvas.width = STICKER_W;
       tileCanvas.height = STICKER_H;
       const tctx = tileCanvas.getContext("2d");
-      // Fill with PURE GREEN (#00FF00) so chroma-key downstream removes
-      // the unfilled padding (left/right 25px when contain-fitting a
-      // square cell into landscape 370×320). Was: white — which chroma
+      // Fill with the selected chroma-key color so downstream removal
+      // catches the unfilled padding (left/right 25px when contain-fitting
+      // a square cell into landscape 370×320). Was: white — which chroma
       // key didn't recognize → showed up as opaque white bars.
-      tctx.fillStyle = "#00FF00";
+      tctx.fillStyle = chromaKeyColor().hex;
       tctx.fillRect(0, 0, STICKER_W, STICKER_H);
 
       // Crop with inset on each side, then contain-fit the cropped
@@ -1189,6 +1221,7 @@ async function rerollTile(idx, overridePhrase = null) {
       slots: rerollSlots,
       styleHint: state.styleHint,
       withText: state.withText,
+      chromaKey: state.chromaKey,
       campaign: state.campaign,
       lang: state.textLang,
     });
@@ -1225,6 +1258,11 @@ const bgProgress = $("bg-progress");
 const bgBarFill = $("bg-bar-fill");
 const bgProgressText = $("bg-progress-text");
 const bgTuneSelect = $("bg-tune-select");
+const bgKeySelect = $("bg-key-select");
+if (bgKeySelect) {
+  bgKeySelect.value = state.chromaKey;
+  bgKeySelect.addEventListener("change", () => setChromaKey(bgKeySelect.value));
+}
 
 bgRemoveBtn.addEventListener("click", removeAllBackgrounds);
 bgRestoreBtn.addEventListener("click", restoreAllBackgrounds);
@@ -1232,9 +1270,8 @@ const downloadGridBtn = $("download-grid-btn");
 if (downloadGridBtn) downloadGridBtn.addEventListener("click", downloadOriginalGrid);
 
 // (Previously ensureBgLib loaded @imgly's ISNet model for white-bg
-// fallback. Removed — chroma-key on green is the only path now. No
-// 30MB ML model download, no white-shirt-eaten edge cases. If user
-// uploads a non-green BYOG grid, we tell them clearly.)
+// fallback. Removed — chroma-key is the only path now. No 30MB ML
+// model download, no white-shirt-eaten edge cases.
 
 async function removeAllBackgrounds() {
   if (state.tiles.length === 0) return;
@@ -1290,7 +1327,8 @@ async function restoreAllBackgrounds() {
   }
   state.bgRemoved = false;
   bgRestoreBtn.hidden = true;
-  setBgProgress(0, "已還原成 Gemini 原圖（綠底 #00FF00 + 黑邊）。可重新去背。");
+  const key = chromaKeyColor();
+  setBgProgress(0, `已還原成 Gemini 原圖（${key.label} ${key.hex} + 黑邊）。可重新去背。`);
 }
 
 function setBgProgress(pct, text) {
@@ -1316,20 +1354,20 @@ function setBgProgress(pct, text) {
 // Result: Gemini's exact text (including stylized strokes, white halo,
 // any tear-drop integration) is preserved; only the truly empty white
 // card area becomes transparent. No more double text, no more ghosting.
-// Always chroma-key out green from the source canvas. Returns the
+// Always chroma-key out the selected key color from the source canvas. Returns the
 // transparent-bg canvas. (Previously gated on detectBgType, which had
 // a false-negative on densely-composed cells where the character
-// covered most of the frame and visible green pixels fell below 20%.
-// Always-run is safer: AI path always sends green; BYOG without green
-// is a no-op since chroma key matches no pixels — the image just
-// stays unchanged.)
+// covered most of the frame and visible key-color pixels fell below 20%.
+// Always-run is safer: AI path sends a selected chroma key; BYOG without
+// that key color is a no-op since chroma key matches no pixels — the
+// image just stays unchanged.)
 async function bgRemoveWithTextPreserve(srcCanvas, tune = "balanced") {
   const w = srcCanvas.width;
   const h = srcCanvas.height;
   const origCtx = srcCanvas.getContext("2d");
   const origData = origCtx.getImageData(0, 0, w, h);
   const orig = origData.data;
-  return chromaKeyGreen(srcCanvas, w, h, orig, "none", tune);
+  return chromaKeyColorOut(srcCanvas, w, h, orig, "none", tune, state.chromaKey);
 }
 
 // Legacy ISNet path retained for reference; never called now.
@@ -1437,20 +1475,51 @@ function detectBgType(orig, w, h) {
 }
 
 const CHROMA_TUNE_PROFILES = {
-  safe: { hard: 0.32, soft: 0.12, minG: 170, maxRB: 100, dominance: 1.9 },
-  balanced: { hard: 0.25, soft: 0.05, minG: 150, maxRB: 110, dominance: 1.7 },
-  aggressive: { hard: 0.20, soft: 0.04, minG: 130, maxRB: 125, dominance: 1.45 },
+  safe: { hard: 0.32, soft: 0.12, minKey: 170, maxOther: 100, dominance: 1.9 },
+  balanced: { hard: 0.25, soft: 0.05, minKey: 150, maxOther: 110, dominance: 1.7 },
+  aggressive: { hard: 0.20, soft: 0.04, minKey: 130, maxOther: 125, dominance: 1.45 },
 };
 
 function resolveChromaTuneProfile(tune = "balanced") {
   return CHROMA_TUNE_PROFILES[tune] || CHROMA_TUNE_PROFILES.balanced;
 }
 
-// Chroma-key out a green (#00FF00) background with anti-alias decontamination.
-// Per-pixel "green-ness" score → linear ramp to alpha.
-// Then subtract green contribution from semi-transparent edge pixels.
-async function chromaKeyGreen(srcCanvas, w, h, orig, outlineStyle, tune = "balanced") {
+// Chroma-key out a selected green/magenta background with anti-alias cleanup.
+// Per-pixel key-color score → linear ramp to alpha.
+// Then subtract key-color contribution from semi-transparent edge pixels.
+async function chromaKeyColorOut(srcCanvas, w, h, orig, outlineStyle, tune = "balanced", key = "green") {
   const TUNE = resolveChromaTuneProfile(tune);
+  const keyName = normalizeChromaKey(key);
+  const keyScore = (r, g, b) =>
+    keyName === "magenta"
+      ? (Math.min(r, b) - g) / 255
+      : (g - Math.max(r, b)) / 255;
+  const isPureKey = (r, g, b) => {
+    if (keyName === "magenta") {
+      const magenta = Math.min(r, b);
+      return (
+        magenta >= TUNE.minKey &&
+        g <= TUNE.maxOther &&
+        r >= g * TUNE.dominance &&
+        b >= g * TUNE.dominance
+      );
+    }
+    return (
+      g >= TUNE.minKey &&
+      r <= TUNE.maxOther &&
+      b <= TUNE.maxOther &&
+      g >= r * TUNE.dominance &&
+      g >= b * TUNE.dominance
+    );
+  };
+  const despill = (i, r, g, b) => {
+    if (keyName === "magenta") {
+      od[i] = g;
+      od[i + 2] = g;
+    } else {
+      od[i + 1] = (r + b) >> 1;
+    }
+  };
 
   const out = document.createElement("canvas");
   out.width = w; out.height = h;
@@ -1462,34 +1531,23 @@ async function chromaKeyGreen(srcCanvas, w, h, orig, outlineStyle, tune = "balan
   let nKeyed = 0, nKept = 0, nPartial = 0;
   for (let i = 0; i < orig.length; i += 4) {
     const r = orig[i], g = orig[i + 1], b = orig[i + 2];
-    const greenness = (g - Math.max(r, b)) / 255;
-    const pureChromaGreen =
-      g >= TUNE.minG &&
-      r <= TUNE.maxRB &&
-      b <= TUNE.maxRB &&
-      g >= r * TUNE.dominance &&
-      g >= b * TUNE.dominance;
+    const score = keyScore(r, g, b);
+    const pureKey = isPureKey(r, g, b);
     let alpha = 255;
-    if (pureChromaGreen && greenness > TUNE.hard) {
+    if (pureKey && score > TUNE.hard) {
       alpha = 0;
-    } else if (pureChromaGreen && greenness > TUNE.soft) {
-      alpha = Math.round(255 * (TUNE.hard - greenness) / Math.max(0.01, (TUNE.hard - TUNE.soft)));
+    } else if (pureKey && score > TUNE.soft) {
+      alpha = Math.round(255 * (TUNE.hard - score) / Math.max(0.01, (TUNE.hard - TUNE.soft)));
     }
     od[i] = r; od[i + 1] = g; od[i + 2] = b; od[i + 3] = alpha;
     if (alpha === 0) nKeyed++;
     else if (alpha === 255) nKept++;
     else nPartial++;
 
-    // Despill — standard chroma-key technique (also seen in Meiko's
-    // line-sticker-factory): for any non-fully-transparent pixel where
-    // green is the dominant channel, replace G with (R+B)/2 to kill
-    // the green color contamination on edge pixels. Simpler and more
-    // visually correct than inverting the alpha-blend formula.
-    if (alpha > 0 && pureChromaGreen && g > r && g > b) {
-      od[i + 1] = (r + b) >> 1;
-    }
+    // Despill only pixels confidently associated with the key color.
+    if (alpha > 0 && pureKey) despill(i, r, g, b);
   }
-  console.log(`[chroma-key] keyed=${(100*nKeyed/total).toFixed(0)}% kept=${(100*nKept/total).toFixed(0)}% partial=${(100*nPartial/total).toFixed(0)}%`);
+  console.log(`[chroma-key:${keyName}] keyed=${(100*nKeyed/total).toFixed(0)}% kept=${(100*nKept/total).toFixed(0)}% partial=${(100*nPartial/total).toFixed(0)}%`);
 
   let nSpillCleaned = 0;
   const baseAlpha = new Uint8Array(total);
@@ -1508,28 +1566,38 @@ async function chromaKeyGreen(srcCanvas, w, h, orig, outlineStyle, tune = "balan
       if (!touchesEmpty) continue;
       const i = p * 4;
       const r = od[i], g = od[i + 1], b = od[i + 2];
-      const greenness = (g - Math.max(r, b)) / 255;
-      const lightGreenSpill =
-        greenness > Math.max(TUNE.soft, 0.08) &&
-        r >= 90 &&
-        b >= 70 &&
-        g > r * 1.05 &&
-        g > b * 1.05;
-      if (!lightGreenSpill) continue;
-      od[i + 1] = (r + b) >> 1;
+      const score = keyScore(r, g, b);
+      const lightSpill = keyName === "magenta"
+        ? (
+            score > Math.max(TUNE.soft, 0.08) &&
+            r >= 90 &&
+            b >= 90 &&
+            g >= 50 &&
+            r > g * 1.05 &&
+            b > g * 1.05
+          )
+        : (
+            score > Math.max(TUNE.soft, 0.08) &&
+            r >= 90 &&
+            b >= 70 &&
+            g > r * 1.05 &&
+            g > b * 1.05
+          );
+      if (!lightSpill) continue;
+      despill(i, r, g, b);
       od[i + 3] = Math.min(
         od[i + 3],
-        Math.round(255 * (TUNE.hard - greenness) / Math.max(0.01, (TUNE.hard - TUNE.soft))),
+        Math.round(255 * (TUNE.hard - score) / Math.max(0.01, (TUNE.hard - TUNE.soft))),
       );
       nSpillCleaned++;
     }
   }
-  console.log(`[chroma-key] cleaned ${nSpillCleaned} light green spill pixels`);
+  console.log(`[chroma-key:${keyName}] cleaned ${nSpillCleaned} light spill pixels`);
 
   // Edge cleanup pass: any partial-alpha pixel adjacent to a fully-
   // transparent neighbor gets killed too. Eliminates the 1-2 px green
   // halo that survives despill — the fringe pixels nearest the bg
-  // always carry the most green contamination.
+  // always carry the most key-color contamination.
   const ERODE_PASSES = 1;
   let nEroded = 0;
   for (let pass = 0; pass < ERODE_PASSES; pass++) {
@@ -1793,10 +1861,11 @@ async function downloadZip() {
   // "全部去背" yet, the canvases still have a solid white background.
   const anyTransparent = includedTiles.some((t) => t.transparent);
   if (!anyTransparent) {
+    const key = chromaKeyColor();
     const proceed = confirm(
-      "⚠ 還沒去背！下載的 PNG 都是綠底（chroma-key 用的 #00FF00），LINE Creators Market 規定透明背景，這樣上架會被退件。\n\n" +
+      `⚠ 還沒去背！下載的 PNG 都是${key.label}（chroma-key 用的 ${key.hex}），LINE Creators Market 規定透明背景，這樣上架會被退件。\n\n` +
       "→ 確定：先去背再下載（推薦）— 我會自動執行去背\n" +
-      "→ 取消：硬要下載綠底版本",
+      `→ 取消：硬要下載${key.label}版本`,
     );
     if (proceed) {
       // Run bg removal then re-trigger download.
@@ -1852,10 +1921,11 @@ async function downloadStickersOnly() {
   // Same transparency safety check as the main ZIP download.
   const anyTransparent = state.tiles.some((t) => t.transparent);
   if (!anyTransparent) {
+    const key = chromaKeyColor();
     const proceed = confirm(
-      "⚠ 還沒去背！下載的 PNG 都是綠底（chroma-key 用的 #00FF00），貼到任何地方都會看到醜醜的綠色方塊。\n\n" +
+      `⚠ 還沒去背！下載的 PNG 都是${key.label}（chroma-key 用的 ${key.hex}），貼到任何地方都會看到色塊。\n\n` +
       "→ 確定：先去背再下載（推薦）— 我會自動執行去背\n" +
-      "→ 取消：硬要下載綠底版本",
+      `→ 取消：硬要下載${key.label}版本`,
     );
     if (proceed) {
       await removeAllBackgrounds();
@@ -1918,6 +1988,7 @@ function canvasToBlob(canvas, type) {
 }
 
 function buildReadmeText(camp) {
+  const key = chromaKeyColor();
   const campSection = camp
     ? `
 
@@ -1953,7 +2024,7 @@ ZIP 內容
 是否透明背景
 ------------
 - 如果你在前端按過「全部去背」，就是透明 PNG (LINE 要求)。
-- 如果跳過去背，每張會是綠底（#00FF00）；上架前一定要去背，不然會被 LINE 退件。
+- 如果跳過去背，每張會是${key.label}（${key.hex}）；上架前一定要去背，不然會被 LINE 退件。
 ${campSection}
 上架步驟
 --------
@@ -2399,6 +2470,7 @@ async function copyPromptToGemini() {
         slots: cfg,
         styleHint: state.styleHint,
         withText: state.withText,
+        chromaKey: state.chromaKey,
         campaign: state.campaign,
         lang: state.textLang,
       }),
@@ -2628,6 +2700,7 @@ async function loadFromHistory(id) {
   if (e.metadata?.styleHint) state.styleHint = e.metadata.styleHint;
   if (e.metadata?.campaign !== undefined) state.campaign = e.metadata.campaign;
   if (e.metadata?.withText !== undefined) state.withText = e.metadata.withText;
+  setChromaKey(e.metadata?.chromaKey || "green");
   const img = await loadImage(URL.createObjectURL(e.gridBlob));
   const tiles = await splitGrid(img);
   $("step-preview").hidden = false;
