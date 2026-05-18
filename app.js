@@ -1437,9 +1437,9 @@ function detectBgType(orig, w, h) {
 }
 
 const CHROMA_TUNE_PROFILES = {
-  safe: { hard: 0.28, soft: 0.15, islandGreenness: 0.50, islandGDom: 1.7, islandSize: 0.12, islandAdjBg: 0.45 },
-  balanced: { hard: 0.25, soft: 0.12, islandGreenness: 0.42, islandGDom: 1.5, islandSize: 0.18, islandAdjBg: 0.35 },
-  aggressive: { hard: 0.22, soft: 0.08, islandGreenness: 0.34, islandGDom: 1.35, islandSize: 0.28, islandAdjBg: 0.22 },
+  safe: { hard: 0.28, soft: 0.15, islandGreenness: 0.50, islandGDom: 1.7, islandSize: 0.12, islandAdjBg: 0.45, islandHardRatio: 0.94, islandGreenBoost: 0.12 },
+  balanced: { hard: 0.25, soft: 0.12, islandGreenness: 0.42, islandGDom: 1.5, islandSize: 0.18, islandAdjBg: 0.35, islandHardRatio: 0.90, islandGreenBoost: 0.10 },
+  aggressive: { hard: 0.22, soft: 0.08, islandGreenness: 0.34, islandGDom: 1.35, islandSize: 0.28, islandAdjBg: 0.22, islandHardRatio: 0.84, islandGreenBoost: 0.08 },
 };
 
 function resolveChromaTuneProfile(tune = "balanced") {
@@ -1523,6 +1523,7 @@ async function chromaKeyGreen(srcCanvas, w, h, orig, outlineStyle, tune = "balan
     seen[seed] = 1;
     let sumG = 0, sumR = 0, sumB = 0;
     let sumGreenness = 0;
+    let hardCount = 0;
     let touchesEdge = false;
     let borderAdjBg = 0;
     let borderAdjTotal = 0;
@@ -1533,6 +1534,7 @@ async function chromaKeyGreen(srcCanvas, w, h, orig, outlineStyle, tune = "balan
       const greenness = (g - Math.max(r, b)) / 255;
       sumR += r; sumG += g; sumB += b;
       sumGreenness += greenness;
+      if (hardBg[p]) hardCount++;
       const x = p % w;
       const y = (p - x) / w;
       if (x === 0 || y === 0 || x === w - 1 || y === h - 1) touchesEdge = true;
@@ -1567,7 +1569,11 @@ async function chromaKeyGreen(srcCanvas, w, h, orig, outlineStyle, tune = "balan
     const sizeOk = tail <= Math.floor(total * TUNE.islandSize);
     const adjBgRatio = borderAdjTotal ? (borderAdjBg / borderAdjTotal) : 0;
     const surroundedByBg = adjBgRatio >= TUNE.islandAdjBg;
-    if (pureEnough && sizeOk && surroundedByBg) {
+    const hardRatio = hardCount / tail;
+    const strongEnclosedGreen =
+      avgGreenness >= (TUNE.islandGreenness + TUNE.islandGreenBoost) &&
+      hardRatio >= TUNE.islandHardRatio;
+    if (pureEnough && sizeOk && (surroundedByBg || strongEnclosedGreen)) {
       for (let k = 0; k < tail; k++) {
         bgConnected[comp[k]] = 1;
       }
