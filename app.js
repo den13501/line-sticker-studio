@@ -1491,6 +1491,41 @@ async function chromaKeyGreen(srcCanvas, w, h, orig, outlineStyle, tune = "balan
   }
   console.log(`[chroma-key] keyed=${(100*nKeyed/total).toFixed(0)}% kept=${(100*nKept/total).toFixed(0)}% partial=${(100*nPartial/total).toFixed(0)}%`);
 
+  let nSpillCleaned = 0;
+  const baseAlpha = new Uint8Array(total);
+  for (let i = 0, p = 0; i < od.length; i += 4, p++) baseAlpha[p] = od[i + 3];
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const p = y * w + x;
+      if (baseAlpha[p] === 0) continue;
+      let touchesEmpty = false;
+      for (let dy = -1; dy <= 1 && !touchesEmpty; dy++) {
+        for (let dx = -1; dx <= 1 && !touchesEmpty; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          if (baseAlpha[(y + dy) * w + (x + dx)] === 0) touchesEmpty = true;
+        }
+      }
+      if (!touchesEmpty) continue;
+      const i = p * 4;
+      const r = od[i], g = od[i + 1], b = od[i + 2];
+      const greenness = (g - Math.max(r, b)) / 255;
+      const lightGreenSpill =
+        greenness > Math.max(TUNE.soft, 0.08) &&
+        r >= 90 &&
+        b >= 70 &&
+        g > r * 1.05 &&
+        g > b * 1.05;
+      if (!lightGreenSpill) continue;
+      od[i + 1] = (r + b) >> 1;
+      od[i + 3] = Math.min(
+        od[i + 3],
+        Math.round(255 * (TUNE.hard - greenness) / Math.max(0.01, (TUNE.hard - TUNE.soft))),
+      );
+      nSpillCleaned++;
+    }
+  }
+  console.log(`[chroma-key] cleaned ${nSpillCleaned} light green spill pixels`);
+
   // Edge cleanup pass: any partial-alpha pixel adjacent to a fully-
   // transparent neighbor gets killed too. Eliminates the 1-2 px green
   // halo that survives despill — the fringe pixels nearest the bg
