@@ -82,7 +82,7 @@ const ACTION_FOR_PHRASE = {
   "跪了": "kneeling on the ground, defeated",
   "抱抱": "arms wide open inviting a hug",
   "啾": "puckered lips kiss, one eye winked",
-  "嘔嘔嘔": "covering mouth, looking nauseated green-faced",
+  "嘔嘔嘔": "covering mouth, looking nauseated and queasy",
   "不要": "arms crossed in an X, frowning hard",
 };
 
@@ -132,7 +132,7 @@ const STYLE_PRESETS = {
   dslr_portrait: "DSLR portrait, 85mm f/1.4 lens, creamy bokeh background, sharp focus on subject's eyes, professional studio look",
   film_35mm: "35mm film photography, grain, warm color cast, slight light leaks, vintage analogue feel",
   polaroid: "Polaroid instant film aesthetic, slightly faded colors, soft vignette, square frame look",
-  studio_portrait: "studio portrait, clean key light + fill, neutral grey backdrop replaced with our keying green, sharp expression-focused composition",
+  studio_portrait: "studio portrait, clean key light + fill, sharp expression-focused composition (the studio backdrop is replaced by the chroma-key plate defined in STICKER FRAMING below — do NOT add a grey/white/colored studio backdrop)",
   fashion_editorial: "high-fashion editorial photography, dramatic poses, magazine-quality lighting, glossy color grading",
   disposable_camera: "disposable film camera aesthetic, slight overexposure, flash glare, casual snapshot feel, 90s nostalgia",
   film_90s: "1990s film aesthetic, washed pastel tones, soft grain, vintage Asian magazine vibe",
@@ -410,7 +410,7 @@ STICKER FRAMING (every tile):
 - CHARACTER OUTLINE: trace the entire character silhouette with a clean, uniform 2-3px PURE BLACK outline (the boundary between character and the chroma-key background). Apply consistently and identically across ALL 9 cells. This gives the sticker pack a unified "die-cut sticker" look and lets downstream bg removal find the silhouette precisely. Even photo-realistic stickers should have this clean black outline added.
 - ABSOLUTELY NO real brand logos, monograms, or trademarked markings on ANY object — no Chanel CC interlocking pattern, no Louis Vuitton LV monogram, no Gucci GG, no Hermes H, no Burberry check, no Prada triangle, no Nike swoosh, no Apple logo, no Starbucks siren, no automotive logos, etc. ALSO NO fake brand-style English/letter text printed on bags / wallets / clothing / accessories (no "GUVICY" / "PRADO" / "CHANEEL" type fabricated brand-like text either — model often hallucinates fake brand text on luxury items, do NOT do that). All bags, wallets, phones, hats, watches, clothing must be either completely plain (solid color only) or have only abstract non-trademark decoration (a single ribbon, a generic flower, a heart, a star, plain stitching). This rule is STRICT — LINE Creators Market auto-rejects any sticker containing real or fake brand markings, costing the user days of resubmission time.
 - ALSO AVOID iconic luxury BAG SILHOUETTES even when no logo is drawn. Many luxury bags are protected by design patents (新式樣專利) covering the silhouette itself, separate from the logo. Specifically AVOID drawing handbags shaped like: Hermes Birkin or Kelly (trapezoid body with a CENTRAL TURN-LOCK metal closure and two short top handles + two leather straps coming down from the top to fasten the lock — do NOT draw this configuration), Chanel Classic Flap or Boy bag (diamond-quilted leather with a chain-and-leather strap), Louis Vuitton Speedy (rounded barrel zip-top with two short rolled handles), Louis Vuitton Neverfull (open tote with vachetta leather trim and side cinch laces), Dior Lady (cannage quilted body with metal charm letters dangling from handle), Prada Galleria (saffiano leather with triangular plate), Gucci Bamboo (top handle made of bamboo segments), Goyard Saint Louis (chevron herringbone canvas), Fendi Baguette (small rectangular underarm bag). When the scene calls for a handbag, instead draw GENERIC bag shapes: a soft slouchy shoulder bag, a plain canvas tote with simple curved handles, a basic round crossbody, a plain drawstring bucket bag, or a paper shopping bag with cute illustration. Use plain leather/fabric textures with NO quilting patterns, NO distinctive turn-lock metal hardware, NO signature stitching cuts, NO chain straps. The bag should read as "a bag" not as "an obvious luxury brand bag minus the logo".
-- No drop shadows, no soft shadows under feet, no contact shadows, no ground shadows, no ambient green glow.
+- No drop shadows, no soft shadows under feet, no contact shadows, no ground shadows, no ambient ${key.name} glow or color cast on the character from the backdrop.
 - Bold, lively poses — readable at chat-thumbnail size (~120×120 px).
 
 CONTENT COMPLIANCE — LINE Creators Market审核 rules. EVERY cell must comply. ANY violation gets the entire pack auto-rejected, costing the operator days of resubmission. Treat every rule below as hard constraints that override style / theme / user preference:
@@ -470,7 +470,7 @@ OUTPUT RULES — strictly enforced:
           : ""
       }`
     : 'No text, letters, numbers, captions, or watermarks anywhere on the image.'}
-- Every cell must use a PURE WHITE background — uniform across all 9 cells, no off-white, no cream, no gray.
+- Every cell must use the chroma-key backdrop defined in STICKER FRAMING above (solid ${key.color} ${key.hex}) — uniform across all 9 cells. Do NOT substitute white, off-white, cream, gray, or any other color for the backdrop.
 - The character must be obviously the same person/creature/style as the reference in all 9 cells.
 - Two cells MUST NOT share the same pose — vary arms, head tilt, expression.
 - ${withText
